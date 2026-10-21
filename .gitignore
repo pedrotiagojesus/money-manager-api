@@ -147,3 +147,11 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# Money Manager — nunca enviar dados reais ou segredos
+.env*
+!.env.example
+uploads/
+exports/
+backups/
+*.sql
