@@ -154,4 +154,5 @@ vite.config.ts.timestamp-*
 uploads/
 exports/
 backups/
+docs/
 *.sql
