@@ -18,7 +18,9 @@
     "lint": "eslint . && prettier --check .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "repository": {
     "type": "git",
@@ -47,6 +49,7 @@
     "@eslint/js": "^10.0.1",
     "@types/express": "^5.0.6",
     "@types/node": "^24.19.2",
+    "@types/supertest": "^7.2.1",
     "eslint": "^10.13.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.13.0",
@@ -54,9 +57,11 @@
     "lint-staged": "^17.6.0",
     "pino-pretty": "^13.2.0",
     "prettier": "^3.9.10",
+    "supertest": "^7.3.1",
     "tsx": "^4.23.15",
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.72.0",
-    "typescript7": "npm:typescript@7.0.2"
+    "typescript7": "npm:typescript@7.0.2",
+    "vitest": "^5.0.5"
   }
 }
