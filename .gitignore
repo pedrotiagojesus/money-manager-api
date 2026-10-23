@@ -156,3 +156,4 @@ exports/
 backups/
 docs/
 *.sql
+src/generated/
