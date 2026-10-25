@@ -157,3 +157,4 @@ backups/
 docs/
 *.sql
 src/generated/
+!prisma/migrations/**/migration.sql
