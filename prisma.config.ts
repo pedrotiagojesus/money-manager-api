@@ -1,9 +1,11 @@
 import { defineConfig, env } from 'prisma/config';
 
-try {
-  process.loadEnvFile();
-} catch {
-  // Sem .env (CI, Docker): as variáveis vêm do ambiente
+if (!process.env.DATABASE_URL) {
+  try {
+    process.loadEnvFile();
+  } catch {
+    // Sem .env (CI, Docker): as variáveis vêm do ambiente
+  }
 }
 
 export default defineConfig({
