@@ -5,7 +5,6 @@ export default defineConfig({
     env: {
       NODE_ENV: 'test',
       LOG_LEVEL: 'silent',
-      DATABASE_URL: 'postgresql://test:test@localhost:5432/test',
     },
     projects: [
       {
@@ -14,6 +13,7 @@ export default defineConfig({
           name: 'unit',
           include: ['src/**/*.test.ts'],
           exclude: ['src/**/*.int.test.ts'],
+          env: { DATABASE_URL: 'postgresql://test:test@localhost:5432/test' },
         },
       },
       {
@@ -21,6 +21,8 @@ export default defineConfig({
         test: {
           name: 'integration',
           include: ['src/**/*.int.test.ts', 'test/**/*.int.test.ts'],
+          globalSetup: ['test/setup/postgres.ts'],
+          setupFiles: ['test/setup/database-url.ts'],
         },
       },
     ],
