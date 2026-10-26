@@ -1,7 +1,12 @@
 import request from 'supertest';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it, beforeEach } from 'vitest';
 import { createApp } from '../../app.js';
 import { prisma } from '../../lib/prisma.js';
+import { resetDatabase } from '../../../test/helpers/database.js';
+
+beforeEach(async () => {
+  await resetDatabase();
+});
 
 afterAll(async () => {
   await prisma.$disconnect();

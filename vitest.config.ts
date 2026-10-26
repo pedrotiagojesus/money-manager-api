@@ -23,6 +23,7 @@ export default defineConfig({
           include: ['src/**/*.int.test.ts', 'test/**/*.int.test.ts'],
           globalSetup: ['test/setup/postgres.ts'],
           setupFiles: ['test/setup/database-url.ts'],
+          fileParallelism: false,
         },
       },
     ],
