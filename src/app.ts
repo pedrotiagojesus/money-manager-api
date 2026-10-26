@@ -6,16 +6,19 @@ import { openApiRouter } from './openapi/openapi.routes.js';
 
 interface AppDeps {
   checkDatabase?: HealthCheck;
+  docs?: boolean;
 }
 
-export function createApp({ checkDatabase }: AppDeps = {}): Express {
+export function createApp({ checkDatabase, docs = false }: AppDeps = {}): Express {
   const app = express();
   app.disable('x-powered-by');
   app.use(requestLogger);
   app.use(express.json());
 
   app.use(healthRouter({ checkDatabase }));
-  app.use(openApiRouter());
+  if (docs) {
+    app.use(openApiRouter());
+  }
 
   app.use(notFoundHandler);
   app.use(errorHandler);
