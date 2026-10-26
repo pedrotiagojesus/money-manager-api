@@ -1,0 +1,74 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Money Manager API",
+    "version": "0.1.0",
+    "description": "API REST do Money Manager: contas, categorias, transações e património."
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Sistema"],
+        "summary": "Estado da API e da base de dados",
+        "responses": {
+          "200": {
+            "description": "API e base de dados operacionais",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "A base de dados não responde",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["ok", "error"]
+          },
+          "checks": {
+            "type": "object",
+            "properties": {
+              "api": {
+                "type": "string",
+                "const": "up"
+              },
+              "database": {
+                "type": "string",
+                "enum": ["up", "down", "not_configured"]
+              }
+            },
+            "required": ["api", "database"],
+            "additionalProperties": false
+          },
+          "uptime": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "Segundos desde o arranque da API"
+          }
+        },
+        "required": ["status", "checks", "uptime"],
+        "additionalProperties": false
+      }
+    }
+  }
+}
