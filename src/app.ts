@@ -2,6 +2,7 @@ import express, { type Express } from 'express';
 import { healthRouter, type HealthCheck } from './modules/health/health.routes.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { requestLogger } from './middleware/requestLogger.js';
+import { openApiRouter } from './openapi/openapi.routes.js';
 
 interface AppDeps {
   checkDatabase?: HealthCheck;
@@ -14,6 +15,7 @@ export function createApp({ checkDatabase }: AppDeps = {}): Express {
   app.use(express.json());
 
   app.use(healthRouter({ checkDatabase }));
+  app.use(openApiRouter());
 
   app.use(notFoundHandler);
   app.use(errorHandler);

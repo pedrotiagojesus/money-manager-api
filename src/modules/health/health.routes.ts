@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import type { CheckStatus, HealthResponse } from './health.schemas.js';
 
 export type HealthCheck = () => Promise<unknown>;
 
@@ -6,8 +7,6 @@ interface HealthOptions {
   checkDatabase?: HealthCheck;
   timeoutMs?: number;
 }
-
-type CheckStatus = 'up' | 'down' | 'not_configured';
 
 async function runCheck(check: HealthCheck | undefined, timeoutMs: number): Promise<CheckStatus> {
   if (!check) return 'not_configured';
@@ -34,11 +33,13 @@ export function healthRouter({ checkDatabase, timeoutMs = 2000 }: HealthOptions 
     const database = await runCheck(checkDatabase, timeoutMs);
     const healthy = database !== 'down';
 
-    res.status(healthy ? 200 : 503).json({
+    const body: HealthResponse = {
       status: healthy ? 'ok' : 'error',
       checks: { api: 'up', database },
       uptime: Math.round(process.uptime()),
-    });
+    };
+
+    res.status(healthy ? 200 : 503).json(body);
   });
 
   return router;
