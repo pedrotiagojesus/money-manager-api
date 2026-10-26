@@ -2,9 +2,9 @@ import request from 'supertest';
 import { describe, expect, it } from 'vitest';
 import { createApp } from '../app.js';
 
-describe('GET /openapi.json', () => {
+describe('documentação da API', () => {
   it('devolve o documento OpenAPI com a rota /health', async () => {
-    const res = await request(createApp()).get('/openapi.json');
+    const res = await request(createApp({ docs: true })).get('/openapi.json');
 
     expect(res.status).toBe(200);
     expect(res.body).toMatchObject({
@@ -13,5 +13,19 @@ describe('GET /openapi.json', () => {
       paths: { '/health': { get: { tags: ['Sistema'] } } },
       components: { schemas: { HealthResponse: { type: 'object' } } },
     });
+  });
+
+  it('serve o Swagger UI em /docs', async () => {
+    const res = await request(createApp({ docs: true })).get('/docs/');
+
+    expect(res.status).toBe(200);
+    expect(res.text).toContain('Money Manager API');
+  });
+
+  it('não expõe a documentação quando está desligada', async () => {
+    const app = createApp({ docs: false });
+
+    expect((await request(app).get('/docs/')).status).toBe(404);
+    expect((await request(app).get('/openapi.json')).status).toBe(404);
   });
 });
