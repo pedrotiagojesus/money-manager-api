@@ -5,6 +5,13 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   ci:
     name: ci
@@ -12,7 +19,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
@@ -21,17 +28,22 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version-file: .nvmrc
+          cache: npm
 
       - name: Instalar dependências
-        run: |
-          if [ -f package-lock.json ]; then npm ci
-          elif [ -f package.json ]; then npm install
-          fi
+        run: npm ci
 
-      - run: npm run --if-present lint
-      - run: npm run --if-present typecheck
-      - run: npm run --if-present test
-      - run: npm run --if-present build
+      - name: Lint (ESLint + Prettier)
+        run: npm run lint
+
+      - name: Verificação de tipos
+        run: npm run typecheck
+
+      - name: Testes (unitários + integração com Testcontainers)
+        run: npm test
+
+      - name: Build
+        run: npm run build
