@@ -6,6 +6,10 @@ const envSchema = z.object({
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
   DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
   API_DOCS_ENABLED: z.stringbool().optional(),
+  APP_URL: z.url().default('http://localhost:5173'),
+  SMTP_HOST: z.string().default('localhost'),
+  SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(1025),
+  MAIL_FROM: z.string().default('Money Manager <no-reply@money-manager.local>'),
 });
 
 const result = envSchema.safeParse(process.env);
