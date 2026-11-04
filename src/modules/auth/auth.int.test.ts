@@ -17,6 +17,13 @@ const fakeMailer: Mailer = {
 const app = createApp({ mailer: fakeMailer });
 const body = { email: 'Ana@Example.test', password: 'password-segura', name: 'Ana' };
 
+const registerAndGetToken = async () => {
+  await request(app).post('/api/v1/auth/register').send(body);
+  const message = sent.at(0);
+  const [, token = ''] = /token=([\w-]+)/.exec(message?.text ?? '') ?? [];
+  return token;
+};
+
 beforeEach(async () => {
   await resetDatabase();
   sent.length = 0;
@@ -67,5 +74,51 @@ describe('POST /api/v1/auth/register', () => {
 
     expect(res.status).toBe(409);
     expect(sent).toHaveLength(1);
+  });
+});
+
+describe('POST /api/v1/auth/verify-email', () => {
+  it('verifica o email com um token válido', async () => {
+    const token = await registerAndGetToken();
+
+    const res = await request(app).post('/api/v1/auth/verify-email').send({ token });
+
+    const user = await prisma.user.findUniqueOrThrow({ where: { email: 'ana@example.test' } });
+    expect(user.emailVerifiedAt).not.toBeNull();
+    expect(res.status).toBe(204);
+  });
+
+  it('verifica email com um token utilizado 2 vezes', async () => {
+    const token = await registerAndGetToken();
+
+    const first = await request(app).post('/api/v1/auth/verify-email').send({ token });
+    expect(first.status).toBe(204);
+
+    const second = await request(app).post('/api/v1/auth/verify-email').send({ token });
+    expect(second.status).toBe(400);
+  });
+
+  it('recusa um token que não existe', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/verify-email')
+      .send({ token: 'invalid-token' });
+    expect(res.status).toBe(400);
+  });
+
+  it('recusa um token expirado', async () => {
+    const token = await registerAndGetToken();
+
+    await prisma.emailVerificationToken.update({
+      where: { tokenHash: hashToken(token) },
+      data: { expiresAt: new Date(Date.now() - 1000) },
+    });
+
+    const res = await request(app).post('/api/v1/auth/verify-email').send({ token });
+    expect(res.status).toBe(400);
+  });
+
+  it('recusa um pedido sem token', async () => {
+    const res = await request(app).post('/api/v1/auth/verify-email').send({});
+    expect(res.status).toBe(400);
   });
 });

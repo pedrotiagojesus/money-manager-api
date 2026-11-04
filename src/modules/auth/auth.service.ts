@@ -8,7 +8,7 @@ import { prisma } from '../../lib/prisma.js';
 import { generateToken, hashToken } from '../../lib/tokens.js';
 import { createUserWithPersonalWorkspace } from '../users/users.service.js';
 import { verificationEmail } from './auth.emails.js';
-import type { RegisterBody } from './auth.schemas.js';
+import type { RegisterBody, VerifyEmailBody } from './auth.schemas.js';
 
 const VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -45,4 +45,35 @@ export async function register({ email, password, name }: RegisterBody, mailer: 
   }
 
   return user;
+}
+
+export async function verifyEmail({ token }: VerifyEmailBody) {
+  const tokenHash = hashToken(token);
+  const now = new Date();
+
+  await prisma.$transaction(async (tx) => {
+    const { count } = await tx.emailVerificationToken.updateMany({
+      where: { usedAt: null, expiresAt: { gt: now }, tokenHash },
+      data: { usedAt: now },
+    });
+
+    if (count === 0) {
+      throw new HttpError(400, 'Link inválido ou expirado');
+    }
+
+    const record = await tx.emailVerificationToken.findUniqueOrThrow({
+      where: { tokenHash },
+      select: { userId: true },
+    });
+
+    await tx.user.updateMany({
+      where: { id: record.userId, emailVerifiedAt: null },
+      data: { emailVerifiedAt: now },
+    });
+
+    await tx.emailVerificationToken.updateMany({
+      where: { userId: record.userId, usedAt: null },
+      data: { usedAt: now },
+    });
+  });
 }

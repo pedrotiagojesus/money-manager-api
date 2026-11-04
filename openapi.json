@@ -67,6 +67,30 @@
           }
         }
       }
+    },
+    "/api/v1/auth/verify-email": {
+      "post": {
+        "tags": ["Autenticação"],
+        "summary": "Verificar email",
+        "description": "Verifica o email do usuário com o token de verificação.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyEmail"
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Email verificado"
+          },
+          "400": {
+            "description": "Token inválido ou expirado"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -92,6 +116,17 @@
           }
         },
         "required": ["email", "password", "name"]
+      },
+      "VerifyEmail": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 43
+          }
+        },
+        "required": ["token"]
       },
       "HealthResponse": {
         "type": "object",

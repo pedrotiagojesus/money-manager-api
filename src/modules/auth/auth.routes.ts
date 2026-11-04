@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { Mailer } from '../../lib/mailer.js';
-import { registerBodySchema, type UserResponse } from './auth.schemas.js';
-import { register } from './auth.service.js';
+import { registerBodySchema, type UserResponse, verifyEmailSchema } from './auth.schemas.js';
+import { register, verifyEmail } from './auth.service.js';
 
 interface AuthOptions {
   mailer: Mailer;
@@ -16,6 +16,13 @@ export function authRouter({ mailer }: AuthOptions): Router {
 
     const response: UserResponse = { id: user.id, email: user.email, name: user.name };
     res.status(201).json(response);
+  });
+
+  router.post('/auth/verify-email', async (req, res) => {
+    const body = verifyEmailSchema.parse(req.body);
+    await verifyEmail(body);
+
+    res.sendStatus(204);
   });
 
   return router;
