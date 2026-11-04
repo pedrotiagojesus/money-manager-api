@@ -15,5 +15,12 @@ export const userResponseSchema = z
   .object({ id: z.uuid(), email: z.email(), name: z.string() })
   .meta({ id: 'User' });
 
+export const verifyEmailSchema = z
+  .object({
+    token: z.string().min(1, 'Link inválido ou expirado').max(43, 'Link inválido ou expirado'),
+  })
+  .meta({ id: 'VerifyEmail' });
+
 export type RegisterBody = z.infer<typeof registerBodySchema>;
 export type UserResponse = z.infer<typeof userResponseSchema>;
+export type VerifyEmailBody = z.infer<typeof verifyEmailSchema>;
