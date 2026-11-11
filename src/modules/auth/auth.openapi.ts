@@ -1,5 +1,10 @@
 import type { ZodOpenApiPathsObject } from 'zod-openapi';
-import { registerBodySchema, userResponseSchema, verifyEmailSchema } from './auth.schemas.js';
+import {
+  loginBodySchema,
+  registerBodySchema,
+  userResponseSchema,
+  verifyEmailSchema,
+} from './auth.schemas.js';
 
 export const authPaths: ZodOpenApiPathsObject = {
   '/api/v1/auth/register': {
@@ -27,6 +32,19 @@ export const authPaths: ZodOpenApiPathsObject = {
       responses: {
         '204': { description: 'Email verificado' },
         '400': { description: 'Token inválido ou expirado' },
+      },
+    },
+  },
+  '/api/v1/auth/login': {
+    post: {
+      tags: ['Autenticação'],
+      summary: 'Iniciar sessão',
+      description: 'Inicia sessão com o email e password do usuário.',
+      requestBody: { content: { 'application/json': { schema: loginBodySchema } } },
+      responses: {
+        '200': { description: 'Sessão iniciada' },
+        '401': { description: 'Email ou password incorretos' },
+        '403': { description: 'Email não verificado' },
       },
     },
   },

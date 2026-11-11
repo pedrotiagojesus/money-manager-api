@@ -1,7 +1,13 @@
 import { Router } from 'express';
 import type { Mailer } from '../../lib/mailer.js';
-import { registerBodySchema, type UserResponse, verifyEmailSchema } from './auth.schemas.js';
-import { register, verifyEmail } from './auth.service.js';
+import {
+  loginBodySchema,
+  registerBodySchema,
+  type UserResponse,
+  verifyEmailSchema,
+} from './auth.schemas.js';
+import { login, register, verifyEmail, REFRESH_TOKEN_TTL_MS } from './auth.service.js';
+import { ACCESS_TOKEN_TTL_SECONDS } from '../../lib/jwt.js';
 
 interface AuthOptions {
   mailer: Mailer;
@@ -23,6 +29,20 @@ export function authRouter({ mailer }: AuthOptions): Router {
     await verifyEmail(body);
 
     res.sendStatus(204);
+  });
+
+  router.post('/auth/login', async (req, res) => {
+    const body = loginBodySchema.parse(req.body);
+    const { accessToken, refreshToken } = await login(body, req.get('user-agent') ?? '');
+    res.cookie('refresh_token', refreshToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'strict',
+      path: '/api/v1/auth',
+      maxAge: REFRESH_TOKEN_TTL_MS,
+    });
+
+    res.json({ accessToken, tokenType: 'Bearer', expiresIn: ACCESS_TOKEN_TTL_SECONDS }).send(200);
   });
 
   return router;

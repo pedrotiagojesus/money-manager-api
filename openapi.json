@@ -91,6 +91,33 @@
           }
         }
       }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": ["Autenticação"],
+        "summary": "Iniciar sessão",
+        "description": "Inicia sessão com o email e password do usuário.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sessão iniciada"
+          },
+          "401": {
+            "description": "Email ou password incorretos"
+          },
+          "403": {
+            "description": "Email não verificado"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -127,6 +154,23 @@
           }
         },
         "required": ["token"]
+      },
+      "LoginBody": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 254,
+            "format": "email",
+            "pattern": "^(?:[A-Za-z0-9_'+\\-]+\\.)*[A-Za-z0-9_'+\\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\\-]*\\.)+[A-Za-z]{2,}$"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "required": ["email", "password"]
       },
       "HealthResponse": {
         "type": "object",

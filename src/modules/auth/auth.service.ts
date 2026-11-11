@@ -3,18 +3,38 @@ import { Prisma } from '../../generated/prisma/client.js';
 import { HttpError } from '../../lib/httpError.js';
 import { logger } from '../../lib/logger.js';
 import type { Mailer } from '../../lib/mailer.js';
-import { hashPassword } from '../../lib/password.js';
+import { hashPassword, verifyPassword } from '../../lib/password.js';
 import { prisma } from '../../lib/prisma.js';
 import { generateToken, hashToken } from '../../lib/tokens.js';
 import { createUserWithPersonalWorkspace } from '../users/users.service.js';
 import { verificationEmail } from './auth.emails.js';
 import type { RegisterBody, VerifyEmailBody } from './auth.schemas.js';
+import { randomUUID } from 'crypto';
+import { signAccessToken } from '../../lib/jwt.js';
+import type { LoginBody } from './auth.schemas.js';
 
 const VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
+export const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const dummyPasswordHash = hashPassword('password-que-nunca-sera-usada');
 
 function isUniqueViolation(err: unknown): boolean {
   return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
 }
+
+const issueTokens = async (userId: string, familyId: string, userAgent: string) => {
+  const refreshToken = generateToken();
+  await prisma.refreshToken.create({
+    data: {
+      userId,
+      familyId,
+      userAgent,
+      tokenHash: hashToken(refreshToken),
+      expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
+    },
+  });
+  const accessToken = await signAccessToken(userId);
+  return { accessToken, refreshToken };
+};
 
 export async function register({ email, password, name }: RegisterBody, mailer: Mailer) {
   const passwordHash = await hashPassword(password);
@@ -76,4 +96,25 @@ export async function verifyEmail({ token }: VerifyEmailBody) {
       data: { usedAt: now },
     });
   });
+}
+
+export async function login({ email, password }: LoginBody, userAgent: string) {
+  const user = await prisma.user.findUnique({
+    where: { email },
+  });
+
+  if (!user) {
+    await verifyPassword(await dummyPasswordHash, password);
+    throw new HttpError(401, 'Email ou password incorretos');
+  }
+
+  if (!(await verifyPassword(user.passwordHash, password))) {
+    throw new HttpError(401, 'Email ou password incorretos');
+  }
+
+  if (user.emailVerifiedAt === null) {
+    throw new HttpError(403, 'Email não verificado');
+  }
+
+  return issueTokens(user.id, randomUUID(), userAgent);
 }

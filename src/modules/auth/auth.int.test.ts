@@ -5,6 +5,10 @@ import type { MailMessage, Mailer } from '../../lib/mailer.js';
 import { prisma } from '../../lib/prisma.js';
 import { hashToken } from '../../lib/tokens.js';
 import { resetDatabase } from '../../../test/helpers/database.js';
+import { createUser } from '../../../test/factories/index.js';
+import { hashPassword } from '../../lib/password.js';
+import { verifyAccessToken } from '../../lib/jwt.js';
+import { loginResponseSchema } from './auth.schemas.js';
 
 const sent: MailMessage[] = [];
 const fakeMailer: Mailer = {
@@ -22,6 +26,22 @@ const registerAndGetToken = async () => {
   const message = sent.at(0);
   const [, token = ''] = /token=([\w-]+)/.exec(message?.text ?? '') ?? [];
   return token;
+};
+
+const createVerifiedUser = async (
+  email: string,
+  password: string,
+  emailVerifiedAt: Date | null,
+) => {
+  return await createUser({
+    email,
+    passwordHash: await hashPassword(password),
+    emailVerifiedAt,
+  });
+};
+
+const findRefreshTokenCookie = (cookie: string[] | undefined) => {
+  return cookie?.find((c) => c.startsWith('refresh_token='));
 };
 
 beforeEach(async () => {
@@ -120,5 +140,121 @@ describe('POST /api/v1/auth/verify-email', () => {
   it('recusa um pedido sem token', async () => {
     const res = await request(app).post('/api/v1/auth/verify-email').send({});
     expect(res.status).toBe(400);
+  });
+});
+
+describe('POST /api/v1/auth/login', () => {
+  const email = 'ana@example.test';
+  const password = 'a-password-que-vais-usar';
+  it('entra com email e password certos', async () => {
+    await createVerifiedUser(email, password, new Date());
+    const res = await request(app).post('/api/v1/auth/login').send({
+      email,
+      password,
+    });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      tokenType: 'Bearer',
+      expiresIn: 900,
+    });
+    expect(res.body).toHaveProperty('accessToken');
+  });
+
+  it('recusa uma password errada', async () => {
+    await createVerifiedUser(email, password, new Date());
+    const res = await request(app).post('/api/v1/auth/login').send({
+      email,
+      password: 'wrong-password',
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('recusa um email que não existe', async () => {
+    await createVerifiedUser(email, password, new Date());
+    const res = await request(app).post('/api/v1/auth/login').send({
+      email: 'wrong-email@example.test',
+      password,
+    });
+    expect(res.status).toBe(401);
+  });
+
+  it('responde igual a email inexistente e a password errada', async () => {
+    await createVerifiedUser(email, password, new Date());
+    const unknownEmail = await request(app).post('/api/v1/auth/login').send({
+      email: 'wrong-email@example.test',
+      password,
+    });
+
+    const wrongPassword = await request(app).post('/api/v1/auth/login').send({
+      email,
+      password: 'wrong-password',
+    });
+
+    expect(unknownEmail.status).toBe(401);
+    expect(wrongPassword.status).toBe(401);
+    expect(unknownEmail.body).toMatchObject({ detail: 'Email ou password incorretos' });
+    expect(wrongPassword.body).toMatchObject({ detail: 'Email ou password incorretos' });
+  });
+
+  it('recusa com email não verificado', async () => {
+    await createVerifiedUser(email, password, null);
+    const res = await request(app).post('/api/v1/auth/login').send({
+      email,
+      password,
+    });
+    expect(res.status).toBe(403);
+  });
+
+  it('recusa um pedido sem password', async () => {
+    const res = await request(app).post('/api/v1/auth/login').send({
+      email,
+    });
+    expect(res.status).toBe(400);
+    expect(res.body).toMatchObject({ errors: [{ field: 'password' }] });
+  });
+
+  it('define o cookie refresh_token com HttpOnly, Secure e SameSite=Strict', async () => {
+    await createVerifiedUser(email, password, new Date());
+    const res = await request(app).post('/api/v1/auth/login').send({
+      email,
+      password,
+    });
+
+    expect(res.status).toBe(200);
+
+    const refreshTokenCookie = findRefreshTokenCookie(res.get('Set-Cookie'));
+    expect(refreshTokenCookie).toContain('HttpOnly');
+    expect(refreshTokenCookie).toContain('Secure');
+    expect(refreshTokenCookie).toContain('SameSite=Strict');
+    expect(refreshTokenCookie).toContain('Path=/api/v1/auth');
+  });
+
+  it('guarda o refresh token apenas em hash', async () => {
+    await createVerifiedUser(email, password, new Date());
+    const res = await request(app).post('/api/v1/auth/login').send({
+      email,
+      password,
+    });
+
+    expect(res.status).toBe(200);
+    const cookie = res.get('Set-Cookie') ?? [];
+    const refreshTokenCookie = findRefreshTokenCookie(cookie);
+    const value = refreshTokenCookie?.split(';')[0]?.split('=')[1] ?? '';
+    const stored = await prisma.refreshToken.findUnique({
+      where: { tokenHash: hashToken(value) },
+    });
+
+    expect(stored).not.toBeNull();
+  });
+
+  it('devolve um access token com o id do utilizador', async () => {
+    const user = await createVerifiedUser(email, password, new Date());
+    const res = await request(app).post('/api/v1/auth/login').send({
+      email,
+      password,
+    });
+    expect(res.status).toBe(200);
+    const { accessToken } = loginResponseSchema.parse(res.body);
+    await expect(verifyAccessToken(accessToken)).resolves.toBe(user.id);
   });
 });

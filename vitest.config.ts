@@ -5,6 +5,7 @@ export default defineConfig({
     env: {
       NODE_ENV: 'test',
       LOG_LEVEL: 'silent',
+      JWT_ACCESS_SECRET: 'segredo-de-teste-com-mais-de-32-caracteres',
     },
     projects: [
       {

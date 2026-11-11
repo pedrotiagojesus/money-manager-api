@@ -1,0 +1,20 @@
+title = "Configuração Gitleaks - money-manager-api"
+
+[extend]
+# Mantém todas as regras padrão oficiais do Gitleaks ativas
+useDefault = true
+
+[allowlist]
+description = "Ignora falsos positivos de ambiente de teste e exemplos"
+
+# Ignora esta string exata de teste em qualquer ficheiro do projeto
+regexes = [
+  '''segredo-de-teste-com-mais-de-32-caracteres'''
+]
+
+# Ignora ficheiros de exemplo ou documentação que não contêm segredos reais
+paths = [
+  '''^\.env\.example$''',
+  '''^\.gitleaksignore$''',
+  '''^\.gitleaks\.toml$'''
+]
