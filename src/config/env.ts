@@ -10,6 +10,7 @@ const envSchema = z.object({
   SMTP_HOST: z.string().default('localhost'),
   SMTP_PORT: z.coerce.number().int().min(1).max(65535).default(1025),
   MAIL_FROM: z.string().default('Money Manager <no-reply@money-manager.local>'),
+  JWT_ACCESS_SECRET: z.string().min(32),
 });
 
 const result = envSchema.safeParse(process.env);

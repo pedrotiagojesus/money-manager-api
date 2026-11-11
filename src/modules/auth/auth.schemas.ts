@@ -21,6 +21,26 @@ export const verifyEmailSchema = z
   })
   .meta({ id: 'VerifyEmail' });
 
+export const loginBodySchema = z
+  .object({
+    email: z.email('Email inválido').max(254),
+    password: z
+      .string()
+      .min(1, 'A password é obrigatória')
+      .max(128, 'A password não pode ter mais de 128 caracteres'),
+  })
+  .meta({ id: 'LoginBody' });
+
+export const loginResponseSchema = z
+  .object({
+    accessToken: z.string(),
+    tokenType: z.literal('Bearer'),
+    expiresIn: z.number().int(),
+  })
+  .meta({ id: 'LoginResponse' });
+
 export type RegisterBody = z.infer<typeof registerBodySchema>;
 export type UserResponse = z.infer<typeof userResponseSchema>;
 export type VerifyEmailBody = z.infer<typeof verifyEmailSchema>;
+export type LoginBody = z.infer<typeof loginBodySchema>;
+export type LoginResponse = z.infer<typeof loginResponseSchema>;
