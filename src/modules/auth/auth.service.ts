@@ -1,5 +1,5 @@
 import { env } from '../../config/env.js';
-import { Prisma } from '../../generated/prisma/client.js';
+import { Prisma, PrismaClient } from '../../generated/prisma/client.js';
 import { HttpError } from '../../lib/httpError.js';
 import { logger } from '../../lib/logger.js';
 import type { Mailer } from '../../lib/mailer.js';
@@ -13,6 +13,8 @@ import { randomUUID } from 'crypto';
 import { signAccessToken } from '../../lib/jwt.js';
 import type { LoginBody } from './auth.schemas.js';
 
+type DatabaseClient = Prisma.TransactionClient | PrismaClient;
+
 const VERIFICATION_TTL_MS = 24 * 60 * 60 * 1000;
 export const REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const dummyPasswordHash = hashPassword('password-que-nunca-sera-usada');
@@ -21,9 +23,14 @@ function isUniqueViolation(err: unknown): boolean {
   return err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002';
 }
 
-const issueTokens = async (userId: string, familyId: string, userAgent: string) => {
+const issueTokens = async (
+  dbClient: DatabaseClient,
+  userId: string,
+  familyId: string,
+  userAgent: string,
+) => {
   const refreshToken = generateToken();
-  await prisma.refreshToken.create({
+  await dbClient.refreshToken.create({
     data: {
       userId,
       familyId,
@@ -116,5 +123,53 @@ export async function login({ email, password }: LoginBody, userAgent: string) {
     throw new HttpError(403, 'Email não verificado');
   }
 
-  return issueTokens(user.id, randomUUID(), userAgent);
+  return issueTokens(prisma, user.id, randomUUID(), userAgent);
+}
+
+export async function refresh(token: string | undefined, userAgent: string) {
+  if (!token) {
+    throw new HttpError(401, 'Token inválido');
+  }
+  const tokenHash = hashToken(token);
+
+  const record = await prisma.refreshToken.findUnique({
+    where: { tokenHash },
+  });
+
+  if (!record || record.expiresAt < new Date()) {
+    throw new HttpError(401, 'Token inválido ou expirado');
+  }
+
+  if (record.revokedAt !== null) {
+    await prisma.refreshToken.updateMany({
+      where: { familyId: record.familyId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    throw new HttpError(401, 'Token inválido ou expirado');
+  }
+
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const updateResult = await tx.refreshToken.updateMany({
+        where: { id: record.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+
+      if (updateResult.count === 0) {
+        throw new Error('REUSE_DETECTED');
+      }
+
+      return await issueTokens(tx, record.userId, record.familyId, userAgent);
+    });
+  } catch (error) {
+    const err = error as Error;
+    if (err.message === 'REUSE_DETECTED') {
+      await prisma.refreshToken.updateMany({
+        where: { familyId: record.familyId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      throw new HttpError(401, 'Token inválido ou expirado');
+    }
+    throw error;
+  }
 }

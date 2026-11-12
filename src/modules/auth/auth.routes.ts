@@ -6,7 +6,7 @@ import {
   type UserResponse,
   verifyEmailSchema,
 } from './auth.schemas.js';
-import { login, register, verifyEmail, REFRESH_TOKEN_TTL_MS } from './auth.service.js';
+import { login, register, verifyEmail, REFRESH_TOKEN_TTL_MS, refresh } from './auth.service.js';
 import { ACCESS_TOKEN_TTL_SECONDS } from '../../lib/jwt.js';
 
 interface AuthOptions {
@@ -34,6 +34,21 @@ export function authRouter({ mailer }: AuthOptions): Router {
   router.post('/auth/login', async (req, res) => {
     const body = loginBodySchema.parse(req.body);
     const { accessToken, refreshToken } = await login(body, req.get('user-agent') ?? '');
+    res.cookie('refresh_token', refreshToken, {
+      httpOnly: true,
+      secure: true,
+      sameSite: 'strict',
+      path: '/api/v1/auth',
+      maxAge: REFRESH_TOKEN_TTL_MS,
+    });
+
+    res.json({ accessToken, tokenType: 'Bearer', expiresIn: ACCESS_TOKEN_TTL_SECONDS }).send(200);
+  });
+
+  router.post('/auth/refresh', async (req, res) => {
+    const cookies = req.cookies as Record<string, string | undefined>;
+    const tokenCookie = cookies.refresh_token;
+    const { accessToken, refreshToken } = await refresh(tokenCookie, req.get('user-agent') ?? '');
     res.cookie('refresh_token', refreshToken, {
       httpOnly: true,
       secure: true,
