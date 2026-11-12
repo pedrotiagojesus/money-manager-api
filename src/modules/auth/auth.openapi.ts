@@ -48,4 +48,15 @@ export const authPaths: ZodOpenApiPathsObject = {
       },
     },
   },
+  '/api/v1/auth/refresh': {
+    post: {
+      tags: ['Autenticação'],
+      summary: 'Atualizar token de acesso',
+      description: 'Atualiza o token de acesso com o token de atualização.',
+      responses: {
+        '200': { description: 'Token atualizado' },
+        '401': { description: 'Token inválido ou expirado' },
+      },
+    },
+  },
 };

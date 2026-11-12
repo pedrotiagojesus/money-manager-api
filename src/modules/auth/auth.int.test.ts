@@ -21,6 +21,9 @@ const fakeMailer: Mailer = {
 const app = createApp({ mailer: fakeMailer });
 const body = { email: 'Ana@Example.test', password: 'password-segura', name: 'Ana' };
 
+const email = 'ana@example.test';
+const password = 'a-password-que-vais-usar';
+
 const registerAndGetToken = async () => {
   await request(app).post('/api/v1/auth/register').send(body);
   const message = sent.at(0);
@@ -37,6 +40,14 @@ const createVerifiedUser = async (
     email,
     passwordHash: await hashPassword(password),
     emailVerifiedAt,
+  });
+};
+
+const loginUser = async (email: string, password: string) => {
+  await createVerifiedUser(email, password, new Date());
+  return await request(app).post('/api/v1/auth/login').send({
+    email,
+    password,
   });
 };
 
@@ -144,8 +155,6 @@ describe('POST /api/v1/auth/verify-email', () => {
 });
 
 describe('POST /api/v1/auth/login', () => {
-  const email = 'ana@example.test';
-  const password = 'a-password-que-vais-usar';
   it('entra com email e password certos', async () => {
     await createVerifiedUser(email, password, new Date());
     const res = await request(app).post('/api/v1/auth/login').send({
@@ -256,5 +265,67 @@ describe('POST /api/v1/auth/login', () => {
     expect(res.status).toBe(200);
     const { accessToken } = loginResponseSchema.parse(res.body);
     await expect(verifyAccessToken(accessToken)).resolves.toBe(user.id);
+  });
+});
+
+describe('POST /api/v1/auth/refresh', () => {
+  it('renova o token de acesso', async () => {
+    const loginResponse = await loginUser(email, password);
+    expect(loginResponse.status).toBe(200);
+
+    const refreshTokenCookie = findRefreshTokenCookie(loginResponse.get('Set-Cookie'));
+    const cookiePair = refreshTokenCookie?.split(';')[0] ?? '';
+
+    const refreshResp = await request(app)
+      .post('/api/v1/auth/refresh')
+      .set('Cookie', cookiePair)
+      .send();
+
+    expect(refreshResp.status).toBe(200);
+    expect(refreshResp.body).toHaveProperty('accessToken');
+
+    const newCookies = refreshResp.get('Set-Cookie');
+    expect(newCookies).toBeDefined();
+  });
+
+  it('reutilizar um token antigo deve disparar deteção de roubo', async () => {
+    const loginResponse = await loginUser(email, password);
+    expect(loginResponse.status).toBe(200);
+
+    const refreshTokenCookie = findRefreshTokenCookie(loginResponse.get('Set-Cookie'));
+    const cookiePair = refreshTokenCookie?.split(';')[0] ?? '';
+
+    await request(app).post('/api/v1/auth/refresh').set('Cookie', cookiePair).send();
+
+    const attackResponse = await request(app)
+      .post('/api/v1/auth/refresh')
+      .set('Cookie', cookiePair);
+
+    expect(attackResponse.status).toBe(401);
+
+    const tokensNaDb = await prisma.refreshToken.findMany();
+    expect(tokensNaDb.every((t) => t.revokedAt !== null)).toBe(true);
+  });
+
+  it('sem cookie deve retornar 401', async () => {
+    const res = await request(app).post('/api/v1/auth/refresh');
+    expect(res.status).toBe(401);
+  });
+
+  it('token expirado na BD', async () => {
+    const loginResponse = await loginUser(email, password);
+    expect(loginResponse.status).toBe(200);
+
+    const refreshTokenCookie = findRefreshTokenCookie(loginResponse.get('Set-Cookie'));
+    const cookiePair = refreshTokenCookie?.split(';')[0] ?? '';
+    const refreshToken = cookiePair.split('=')[1] ?? '';
+
+    await prisma.refreshToken.updateMany({
+      data: { expiresAt: new Date(Date.now() - 1000) },
+      where: { tokenHash: hashToken(refreshToken) },
+    });
+
+    const res = await request(app).post('/api/v1/auth/refresh').set('Cookie', cookiePair).send();
+    expect(res.status).toBe(401);
   });
 });

@@ -5,6 +5,7 @@ import { healthRouter, type HealthCheck } from './modules/health/health.routes.j
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import { openApiRouter } from './openapi/openapi.routes.js';
+import cookieParser from 'cookie-parser';
 
 interface AppDeps {
   checkDatabase?: HealthCheck;
@@ -21,6 +22,7 @@ export function createApp({
   app.disable('x-powered-by');
   app.use(requestLogger);
   app.use(express.json());
+  app.use(cookieParser());
 
   app.use(healthRouter({ checkDatabase }));
   app.use('/api/v1', authRouter({ mailer }));
