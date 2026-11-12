@@ -59,4 +59,14 @@ export const authPaths: ZodOpenApiPathsObject = {
       },
     },
   },
+  '/api/v1/auth/logout': {
+    post: {
+      tags: ['Autenticação'],
+      summary: 'Encerrar sessão',
+      description: 'Encerra a sessão do usuário e invalida o token de atualização.',
+      responses: {
+        '204': { description: 'Sessão encerrada' },
+      },
+    },
+  },
 };

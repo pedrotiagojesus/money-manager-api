@@ -329,3 +329,37 @@ describe('POST /api/v1/auth/refresh', () => {
     expect(res.status).toBe(401);
   });
 });
+
+describe('POST /api/v1/auth/logout', () => {
+  it('logout do usuário', async () => {
+    const loginResponse = await loginUser(email, password);
+    expect(loginResponse.status).toBe(200);
+
+    const refreshTokenCookie = findRefreshTokenCookie(loginResponse.get('Set-Cookie'));
+    const cookiePair = refreshTokenCookie?.split(';')[0] ?? '';
+
+    const logoutResponse = await request(app)
+      .post('/api/v1/auth/logout')
+      .set('Cookie', cookiePair)
+      .send();
+
+    expect(logoutResponse.status).toBe(204);
+
+    const setCookieHeader = logoutResponse.get('Set-Cookie');
+    expect(setCookieHeader).toBeDefined();
+
+    const tokensNaDb = await prisma.refreshToken.findMany();
+    expect(tokensNaDb.every((t) => t.revokedAt !== null)).toBe(true);
+
+    const refreshAfterLogout = await request(app)
+      .post('/api/v1/auth/refresh')
+      .set('Cookie', cookiePair)
+      .send();
+
+    expect(refreshAfterLogout.status).toBe(401);
+  });
+  it('logout sem cookie', async () => {
+    const logoutResponse = await request(app).post('/api/v1/auth/logout').send();
+    expect(logoutResponse.status).toBe(204);
+  });
+});

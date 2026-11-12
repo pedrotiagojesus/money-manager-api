@@ -173,3 +173,14 @@ export async function refresh(token: string | undefined, userAgent: string) {
     throw error;
   }
 }
+
+export async function logout(token: string | undefined) {
+  if (!token) {
+    return;
+  }
+  const tokenHash = hashToken(token);
+  await prisma.refreshToken.updateMany({
+    where: { tokenHash, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+}
