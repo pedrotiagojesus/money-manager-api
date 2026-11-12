@@ -6,7 +6,14 @@ import {
   type UserResponse,
   verifyEmailSchema,
 } from './auth.schemas.js';
-import { login, register, verifyEmail, REFRESH_TOKEN_TTL_MS, refresh } from './auth.service.js';
+import {
+  login,
+  register,
+  verifyEmail,
+  REFRESH_TOKEN_TTL_MS,
+  refresh,
+  logout,
+} from './auth.service.js';
 import { ACCESS_TOKEN_TTL_SECONDS } from '../../lib/jwt.js';
 
 interface AuthOptions {
@@ -58,6 +65,14 @@ export function authRouter({ mailer }: AuthOptions): Router {
     });
 
     res.json({ accessToken, tokenType: 'Bearer', expiresIn: ACCESS_TOKEN_TTL_SECONDS }).send(200);
+  });
+
+  router.post('/auth/logout', async (req, res) => {
+    const cookies = req.cookies as Record<string, string | undefined>;
+    const tokenCookie = cookies.refresh_token;
+    await logout(tokenCookie);
+    res.clearCookie('refresh_token', { path: '/api/v1/auth' });
+    res.sendStatus(204);
   });
 
   return router;
