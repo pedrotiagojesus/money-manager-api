@@ -1,6 +1,7 @@
 import express, { type Express } from 'express';
 import { smtpMailer, type Mailer } from './lib/mailer.js';
 import { authRouter } from './modules/auth/auth.routes.js';
+import { userRouter } from './modules/users/users.routes.js';
 import { healthRouter, type HealthCheck } from './modules/health/health.routes.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { requestLogger } from './middleware/requestLogger.js';
@@ -26,6 +27,7 @@ export function createApp({
 
   app.use(healthRouter({ checkDatabase }));
   app.use('/api/v1', authRouter({ mailer }));
+  app.use('/api/v1', userRouter());
   if (docs) {
     app.use(openApiRouter());
   }
