@@ -7,6 +7,7 @@ import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { requestLogger } from './middleware/requestLogger.js';
 import { openApiRouter } from './openapi/openapi.routes.js';
 import cookieParser from 'cookie-parser';
+import { workspaceRouter } from './modules/workspaces/workspaces.routes.js';
 
 interface AppDeps {
   checkDatabase?: HealthCheck;
@@ -28,6 +29,7 @@ export function createApp({
   app.use(healthRouter({ checkDatabase }));
   app.use('/api/v1', authRouter({ mailer }));
   app.use('/api/v1', userRouter());
+  app.use('/api/v1', workspaceRouter());
   if (docs) {
     app.use(openApiRouter());
   }
