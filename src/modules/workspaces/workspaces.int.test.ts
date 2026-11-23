@@ -5,6 +5,10 @@ import { createUser, createWorkspace } from '../../../test/factories/index.js';
 import { signAccessToken } from '../../lib/jwt.js';
 import request from 'supertest';
 import { createApp } from '../../app.js';
+import {
+  listWorkspacesResponseSchema,
+  singleWorkspaceResponseSchema,
+} from '../../../test/schemas.js';
 
 beforeEach(async () => {
   await resetDatabase();
@@ -73,5 +77,91 @@ describe('modelo de utilizadores e espaços', () => {
       .set('Authorization', `Bearer ${token}`);
 
     expect(response.status).toBe(404);
+  });
+
+  it('POST /workspaces cria um espaço com o utilizador como OWNER e aparece no GET /workspaces', async () => {
+    const user = await createUser({ name: 'Bruno' });
+    const token = await signAccessToken(user.id);
+
+    const createRes = await request(app)
+      .post('/api/v1/workspaces')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ name: 'Finanças Pessoais' });
+
+    const { workspace } = singleWorkspaceResponseSchema.parse(createRes.body);
+
+    expect(createRes.status).toBe(201);
+    expect(workspace).toMatchObject({
+      name: 'Finanças Pessoais',
+      role: 'OWNER',
+    });
+
+    const listRes = await request(app)
+      .get('/api/v1/workspaces')
+      .set('Authorization', `Bearer ${token}`);
+
+    const { workspaces } = listWorkspacesResponseSchema.parse(listRes.body);
+
+    expect(listRes.status).toBe(200);
+    expect(workspaces).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: workspace.id,
+          name: 'Finanças Pessoais',
+          role: 'OWNER',
+        }),
+      ]),
+    );
+  });
+
+  it('GET /workspaces isola os dados: Ana só vê os espaços dela e não os do Bruno', async () => {
+    const anaUser = await createUser({ name: 'Ana' });
+    const anaToken = await signAccessToken(anaUser.id);
+    const anaWorkspaceRes = await request(app)
+      .post('/api/v1/workspaces')
+      .set('Authorization', `Bearer ${anaToken}`)
+      .send({ name: 'Espaço Ana' });
+
+    const { workspace: anaWorkspace } = singleWorkspaceResponseSchema.parse(anaWorkspaceRes.body);
+
+    const brunoUser = await createUser({ name: 'Bruno' });
+    const brunoToken = await signAccessToken(brunoUser.id);
+    const brunoWorkspaceRes = await request(app)
+      .post('/api/v1/workspaces')
+      .set('Authorization', `Bearer ${brunoToken}`)
+      .send({ name: 'Espaço Bruno' });
+
+    const { workspace: brunoWorkspace } = singleWorkspaceResponseSchema.parse(
+      brunoWorkspaceRes.body,
+    );
+
+    const listAna = await request(app)
+      .get('/api/v1/workspaces')
+      .set('Authorization', `Bearer ${anaToken}`);
+
+    const { workspaces } = listWorkspacesResponseSchema.parse(listAna.body);
+
+    expect(listAna.status).toBe(200);
+    expect(workspaces).toHaveLength(1);
+    expect(workspaces[0]).toMatchObject({
+      id: anaWorkspace.id,
+      name: 'Espaço Ana',
+      role: 'OWNER',
+    });
+
+    const idsVisiveis = workspaces.map((w) => w.id);
+    expect(idsVisiveis).not.toContain(brunoWorkspace.id);
+  });
+
+  it('POST /workspaces rejeita payload inválido com 400', async () => {
+    const user = await createUser({ name: 'Bruno' });
+    const token = await signAccessToken(user.id);
+
+    const createRes = await request(app)
+      .post('/api/v1/workspaces')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ x: 'Finanças Pessoais' });
+
+    expect(createRes.status).toBe(400);
   });
 });
