@@ -9,6 +9,7 @@ import { createUser } from '../../../test/factories/index.js';
 import { hashPassword } from '../../lib/password.js';
 import { verifyAccessToken } from '../../lib/jwt.js';
 import { loginResponseSchema } from './auth.schemas.js';
+import { z } from 'zod';
 
 const sent: MailMessage[] = [];
 const fakeMailer: Mailer = {
@@ -361,5 +362,38 @@ describe('POST /api/v1/auth/logout', () => {
   it('logout sem cookie', async () => {
     const logoutResponse = await request(app).post('/api/v1/auth/logout').send();
     expect(logoutResponse.status).toBe(204);
+  });
+});
+
+const problemDetailsSchema = z.object({
+  type: z.string(),
+  title: z.string(),
+  status: z.literal(429),
+  detail: z.string(),
+});
+
+describe('Rate limiting no POST /api/v1/auth/login', () => {
+  const app = createApp({ loginRateLimit: 5 });
+
+  it('bloqueia o 6.º pedido consecutivo para o mesmo email com 429 Problem Details', async () => {
+    const email = 'rate-limit-test@example.test';
+
+    for (let i = 1; i <= 5; i += 1) {
+      const res = await request(app)
+        .post('/api/v1/auth/login')
+        .send({ email, password: 'PasswordErrada123!' });
+
+      expect(res.status).not.toBe(429);
+    }
+
+    const sixthRes = await request(app)
+      .post('/api/v1/auth/login')
+      .send({ email: email.toUpperCase(), password: 'PasswordErrada123!' });
+
+    expect(sixthRes.status).toBe(429);
+    expect(sixthRes.headers['content-type']).toContain('application/problem+json');
+
+    const problem = problemDetailsSchema.parse(sixthRes.body);
+    expect(problem.status).toBe(429);
   });
 });
