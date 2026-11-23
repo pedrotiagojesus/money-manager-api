@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import type { RequestHandler } from 'express';
 import type { Mailer } from '../../lib/mailer.js';
 import {
   loginBodySchema,
@@ -15,13 +16,16 @@ import {
   logout,
 } from './auth.service.js';
 import { ACCESS_TOKEN_TTL_SECONDS } from '../../lib/jwt.js';
+import { createLoginRateLimiters } from '../../middleware/rateLimiters.js';
 
 interface AuthOptions {
   mailer: Mailer;
+  loginRateLimit?: number;
 }
 
-export function authRouter({ mailer }: AuthOptions): Router {
+export function authRouter({ mailer, loginRateLimit }: AuthOptions): Router {
   const router = Router();
+  const loginLimiters: RequestHandler[] = createLoginRateLimiters(loginRateLimit);
 
   router.post('/auth/register', async (req, res) => {
     const body = registerBodySchema.parse(req.body);
@@ -38,7 +42,7 @@ export function authRouter({ mailer }: AuthOptions): Router {
     res.sendStatus(204);
   });
 
-  router.post('/auth/login', async (req, res) => {
+  router.post('/auth/login', ...loginLimiters, async (req, res) => {
     const body = loginBodySchema.parse(req.body);
     const { accessToken, refreshToken } = await login(body, req.get('user-agent') ?? '');
     res.cookie('refresh_token', refreshToken, {
